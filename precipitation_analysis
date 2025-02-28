@@ -1,0 +1,77 @@
+#---------------------------------------------------------------
+# Raiza Salomao Precinoto - PhD thesis
+#
+# Chapter 1
+#
+# Precipitation analysis
+# Author: Raíza S. Precinoto
+#
+#----------------------------------------------------------------
+# cleaning the environment
+rm(list = ls(all = T))
+
+citation()
+citation("tidyverse")
+
+pacman::p_load(tidyverse)
+
+#setwd() #set your wd
+
+# Reading daily data
+df = read.csv("precipitation_mm.csv")
+summary(df)
+df$id<-as.factor(df$id)
+unique(df$id) # Chapter 1 - only 20 watersheds selected according to deforestation rates
+
+
+# Dry season ------------------------------------------------------------------------------------------
+
+# Dry months (monthly mean precipitation < 100m)
+df2 = df %>%
+  group_by(month,id) %>%
+  summarise(Monthly_mean_ptt = sum(precipitation_chirps)/33) %>%
+  mutate(
+    Dry = ifelse(Monthly_mean_ptt<100,TRUE,FALSE))
+
+# Convert to numeric  
+df2$Dry <- as.numeric(df2$Dry)
+str(df2)
+
+## Counting dry months
+dry_months_by_watershed = df2 %>%
+  group_by(id) %>%
+  summarise(dry_months_by_watershed = sum(Dry))
+
+
+# Graphics for monthly mean precipitation (1985-2018) ---------------------------------------------
+
+# Showing presence or absence of dry season
+tmp = df %>%
+  group_by(month,id) %>%
+  summarise(Precip = sum(precipitation_chirps)/33)
+tmp$color <- ifelse(tmp$id %in% c(1, 4, 5, 6, 7, 8),"tan1", "darkcyan")
+tmp <- tmp %>%
+  mutate(hydro_month = factor(month, levels = c(7:12, 1:6)))
+
+# Plot
+fig3 <-  ggplot(tmp)+ 
+  aes(x = hydro_month, y = Precip, fill = color) +
+  geom_col(color="black") +
+  geom_hline(yintercept = 100, linewidth = 0.9, linetype="dashed", color="red") +
+  xlab("Month") +
+  ylab("Monthly mean precipitation (mm)") +
+  labs(colour="Basin ID",
+  ) +
+  scale_fill_manual(values = unique(tmp$color)) +  
+  scale_x_discrete(breaks = c(7, 10,1, 4),
+                   labels = c("Jul", 
+                              "Oct",  
+                              "Jan", 
+                              "Apr" 
+                   )) +
+  theme_bw(base_size = 20) +
+  theme(legend.position = "none")+
+  facet_wrap(~id, scales = "fixed");graf_cap1
+
+ggsave("Fig3_PPT_manuscript.jpeg", fig3, height = 7 , width = 15, dpi=500)
+
