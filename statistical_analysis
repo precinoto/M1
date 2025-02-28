@@ -1,0 +1,224 @@
+#---------------------------------------------------------------
+# Raiza Salomao Precinoto - PhD thesis
+#
+# Chapter 1
+#
+# Statistical analysis
+# Author: Raíza S. Precinoto
+#
+#----------------------------------------------------------------
+
+# cleaning the environment
+rm(list = ls(all = T))
+
+pacman::p_load(tidyverse,car,ggpubr,MASS,viridis)
+
+choose.dir() # or use wd() to set your wd 
+
+data<-read.table("data_paper1.txt", header= T,dec=",",sep = ";")
+
+block <- data$DrySeason
+
+# OBS: ANOVA requires --> levene test: non significant (p-value>0.05); shapiro wilk test: non significant (p-value>0.05)
+
+#=============================== Q10 ===============================
+
+Q10_b<-aov(data$Q10~data$LandCover*block)
+shapiro.test(resid(Q10_b)) #shapiro.test --> p-value>0,05 --> ok
+leveneTest(Q10_b) #leveneTest --> p-value > 0,05 --> ok
+summary(Q10_b)
+
+TukeyHSD(aov(data$Q10~data$LandCover*data$DrySeason:data$DrySeason, data=data))
+
+#=============================== Q90 ===============================
+Q90_b<-aov(data$Q90~data$LandCover*block)
+leveneTest(Q90_b) 
+shapiro.test(resid((Q90_b)))
+
+## Box-cox transformation 
+Q90_transf <- (data$Q90)
+boxcox(lm(Q90_transf ~ 1))
+# Transformed data
+new_Q90 <- log(Q90_transf)
+shapiro.test(new_Q90)
+# Histogram
+hist(new_Q90)
+
+Q90_b<-aov(new_Q90~data$LandCover*block) 
+leveneTest(Q90_b)
+shapiro.test(resid((Q90_b))) 
+anova(Q90_b)
+
+TukeyHSD(aov(new_Q90~data$LandCover*data$DrySeason:data$DrySeason, data=data))
+
+
+#=============================== BFI ===============================
+BFI_b <- aov(data$BFI~data$LandCover*data$DrySeason, data=data)
+summary(BFI_b)
+#Check for homoscedasticity
+leveneTest(BFI_b) #Var homog se p-valur>0,05
+shapiro.test(resid(BFI_b)) 
+
+TukeyHSD(aov(data$BFI~data$LandCover*data$DrySeason:data$DrySeason, data=data))
+
+
+#=============================== Flashiness ===============================
+Flash_b<-aov(data$Flashiness~data$LandCover*block)  
+leveneTest(Flash_b) 
+shapiro.test(resid(Flash_b))
+anova(Flash_b)
+
+TukeyHSD(aov(data$Flashiness~data$LandCover*data$DrySeason:data$DrySeason, data=data))
+
+#=============================== Graphics ===============================
+
+#==============  Forest Cover ==============
+LandCoverq10<-ggplot(data,aes(x = LandCover, y = Q10))+ #, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("green","red") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "Q10 (mm)")+
+  scale_x_discrete(name="Land cover")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);LandCoverq10
+
+LandCoverq90<- ggplot(data,aes(x = LandCover, y = Q90)) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("green", "red") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "Q90 (mm)")+
+  scale_x_discrete(name="Land cover")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);LandCoverq90
+
+
+LandCoverflash<- ggplot(data,aes(x = LandCover, y = Flashiness)) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("green","red") ,
+               outlier.size = 2)+
+  scale_y_continuous()+
+  scale_x_discrete(name="Land cover")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);LandCoverflash
+
+
+LandCoverbfi <- ggplot(data,aes(x = LandCover, y = BFI, #fill = factor(LandCover)
+)) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("green","red") ,
+               outlier.size = 2)+
+  scale_y_continuous()+
+  scale_x_discrete(name="Land cover")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);LandCoverbfi
+
+
+fig1 <- ggarrange(LandCoverq10+ rremove("xlab"),LandCoverq90+ rremove("xlab"),LandCoverflash,LandCoverbfi, 
+                 ncol = 2, nrow = 2, labels = c("(A)","(B)","(C)","(D)"));fig1
+
+#============== Dry season ==============
+
+dry_q10 <-ggplot(data,aes(x = DrySeason, y = Q10))+ #, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("darkturquoise","orange") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "Q10 (mm)")+
+  scale_x_discrete(name="Dry season")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);dry_q10 
+
+dry_q90 <-ggplot(data,aes(x = DrySeason, y = Q90))+ #, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("darkturquoise","orange") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "Q90 (mm)")+
+  scale_x_discrete(name="Dry season")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);dry_q90 
+
+dry_flash <-ggplot(data,aes(x = DrySeason, y = Flashiness))+ #, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("darkturquoise","orange") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "Flashiness")+
+  scale_x_discrete(name="Dry season")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);dry_flash
+
+dry_bfi <-ggplot(data,aes(x = DrySeason, y = BFI))+ #, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.07,color = "black", alpha = 0.4,
+               outlier.colour = "black",outlier.shape = 16, fill = c("darkturquoise","orange") ,
+               outlier.size = 2)+
+  scale_y_continuous(name = "BFI")+
+  scale_x_discrete(name="Dry season")+
+  scale_fill_viridis(discrete = TRUE)+
+  theme_bw(base_size = 20);dry_bfi
+
+fig2 <- ggarrange(dry_q10+ rremove("xlab"),dry_q90+ rremove("xlab"),dry_flash,dry_bfi, 
+                 ncol = 2, nrow = 2, labels = c("(A)","(B)","(C)","(D)"));fig2
+
+#==============  Forest Cover X Dry Season ==============
+
+int_q10<-ggplot(data,aes(x = forcats::fct_relevel(DrySeason), y = Q10, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.1,color = "black", alpha = 0.4,
+               outlier.size = 2)+
+  scale_fill_manual(name="Land cover",values = c("green","red"))+
+  scale_y_continuous()+
+  scale_x_discrete(name="Dry season")+#,labels=c("Absent","Short","Long"))+
+  theme_bw(base_size = 20)+
+  theme(legend.position = "bottom");int_q10
+
+int_q90<-ggplot(data,aes(x = forcats::fct_relevel(DrySeason), y = Q90, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.1,color = "black", alpha = 0.4,
+               outlier.size = 2)+
+  scale_fill_manual(name="Land cover",values = c("green","red"))+
+  scale_y_continuous()+
+  scale_x_discrete(name="Dry season")+#,labels=c("Absent","Short","Long"))+
+  theme_bw(base_size = 20)+
+  theme(legend.position = "bottom");int_q90
+
+int_flash<-ggplot(data,aes(x = forcats::fct_relevel(DrySeason), y = Flashiness, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.1,color = "black", alpha = 0.4,
+               outlier.size = 2)+
+  scale_fill_manual(name="Land cover",values = c("green","red"))+
+  scale_y_continuous()+
+  scale_x_discrete(name="Dry season")+
+  theme_bw(base_size = 20)+
+  theme(legend.position = "bottom");int_flash
+
+int_bfi <- ggplot(data,aes(x = forcats::fct_relevel(DrySeason), y = BFI, fill = factor(LandCover))) +
+  geom_violin(width = 0.8,fill="gray95")+
+  geom_boxplot(width = 0.1,color = "black", alpha = 0.4,
+               outlier.size = 2)+
+  scale_fill_manual(name="Land cover",values = c("green","red"))+
+  scale_y_continuous()+
+  scale_x_discrete(name="Dry season")+
+  theme_bw(base_size = 20)+
+  theme(legend.position = "bottom");int_bfi
+
+
+fig3 <- ggarrange(int_q10+ rremove("xlab"),int_q90+ rremove("xlab"),int_flash,int_bfi, 
+                  ncol = 2, nrow = 2, labels = c("(A)","(B)","(C)","(D)"),common.legend = TRUE,legend = "bottom");fig3
+
+
+fig4 <- ggarrange(LandCoverq10+ rremove("xlab"),LandCoverq90+ rremove("xlab"),LandCoverflash+ rremove("xlab"),LandCoverbfi+ rremove("xlab"), int_flash,int_bfi, 
+                  ncol = 2, nrow = 3, labels = c("(A)","(B)","(C)","(D)","(E)","(F)"),
+                  common.legend = TRUE,
+                  legend = "bottom");fig4
+
+# SAVING ===============================
+ggsave("Fig_ForestCover_SupMat.jpeg", fig1, height = 8, width = 12,dpi = 400) 
+ggsave("Fig_DrySeason_SupMat.jpeg", fig2, height = 8, width = 12,dpi = 400) 
+ggsave("Fig_ForestCoverDrySeason_SupMat.jpeg", fig3, height = 8, width = 12,dpi = 400) 
+ggsave("Fig_4.jpeg", fig4, height = 12, width = 10,dpi = 400) 
