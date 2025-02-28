@@ -1,0 +1,235 @@
+#---------------------------------------------------------------
+# Raiza Salomao Precinoto - PhD thesis
+#
+# Chapter 1
+#
+# Hydrological indicators
+# Author: Raíza S. Precinoto
+#
+#----------------------------------------------------------------
+
+# cleaning the environment
+rm(list = ls(all = T))
+
+citation()  #R citation
+citation("tidyverse")
+citation("hydroTSM")
+citation("lfstat")
+citation("ContDataQC")
+
+#Installation from github:
+if(!require(devtools)){install.packages("devtools")}  #install if needed
+devtools::install_github("leppott/ContDataQC")
+
+pacman::p_load(tidyverse,hydroTSM,lfstat,ContDataQC)
+
+# 1-Creating a table with all daily streamflow data for selected watersheds ------------------------------------
+
+# Folder containing all streamflow daily metadata for each selected watershed (only)
+setwd("wd") # set your wd
+
+# Creating (large) list of daily streamflow data for 31 watersheds (beginning)
+b = list.files("wd",
+               pattern = ".txt", full.names = T)
+
+b_tables = sapply(b, FUN = read.table, simplify = FALSE, USE.NAMES = TRUE)
+head(b_tables[[31]])
+
+# Data frame with all watersheds
+df = data.frame()
+for (i in 1:length(b_tables)) {
+  
+  print(i)
+  tmp = b_tables[[i]]
+  tmp$id= i 
+  
+  df = rbind(df,tmp) 
+  
+}
+
+# defining 1985-2018 period
+b_cut = dplyr::filter(df, year >= 1985 & year<= 2018) 
+head(b_cut)
+
+b_obj<-data.frame(b_cut[,3],b_cut[,2],b_cut[,1],b_cut[,4],b_cut[,7]);head(b_obj)
+# Head names correct for b_obj
+names(b_obj)<-c("day","month","year","flow","id");head(b_obj) 
+
+getwd()
+write.csv(b_obj,"streamflow_mm.csv",row.names = F)
+
+# 2- Calculating hydrological indicators ------------------------------------
+
+# setwd
+setwd("wd")
+
+# Reading daily data
+def <- read.csv("streamflow_mm.csv",h=T,dec=".",sep = ",");head(def)
+unique(def$id) # Chapter 1 - only 20 watersheds selected according to deforestation rates
+
+def$id<- as.factor(def$id)
+
+# Replacing zeros with NA
+def2 = def %>%  
+  mutate(flow = na_if(flow,0))
+
+## lfobj: Generic function for creating a low flow object (lfobj)
+# can be created from a timeseries of daily flow, a data.frame with columns "flow", "day", "month" and "year".
+
+# Defining the lfobj
+b_obj <- def2
+b_obj <- b_obj %>% mutate(day = as.integer(day),
+                          month = as.integer(month),
+                          year = as.integer(year),
+                          flow = as.numeric(flow))
+head(b_obj) # all watersheds, defined period ok, and head correct
+
+# 2.1- BFI --------------------------------------------------------------
+
+#baseflow function in lfstat: Given a stream flow hydrograph of flows (regular time series), 
+#the baseflow is separated. The minima of a period (default block.len = 5) is 
+#calculated and turning points are identified. At turning points the baseflow 
+#equals the actual flow, in between, linear interpolation is carried out.
+
+df_bfi <- data.frame()
+
+for (i in seq(1, 20, 1)) {
+  print(i)
+  tmp <- b_obj %>% filter(id == i)
+  tmp <- tmp %>% mutate(flow = ifelse(flow == 0, NA, flow))
+  tmp <- na.omit(tmp)
+  tmp_1 <- createlfobj(tmp[, -5], hyearstart = NULL, baseflow = TRUE)
+  tmp_2 <- BFI(tmp_1, year = "any", breakdays = NULL, yearly = FALSE 
+  )
+  tmp_2 <- data.frame(tmp_2)
+  df_bfi <- rbind(df_bfi, tmp_2)
+}
+
+watershed<-data.frame(rep(c(1:20)))
+df_bfi = cbind(watershed,df_bfi[,1])
+names(df_bfi)<-c("ID","BFI")
+
+
+# 2.2- Q90 --------------------------------------------------------------
+
+
+b_obj <- b_obj %>% mutate(day = as.integer(day),
+                          month = as.integer(month),
+                          year = as.integer(year),
+                          flow = as.numeric(flow))
+
+df_q90_list <- list()
+
+for (i in seq(1, 20, 1)) {
+  print(i)
+  tmp <- b_obj %>% filter(id == i)
+  tmp <- tmp %>% mutate(flow = ifelse(flow == 0, NA, flow))
+  tmp <- na.omit(tmp)  
+  if (nrow(tmp) > 0) { 
+    tmp_1 <- createlfobj(tmp[, -5], hyearstart = 10, baseflow = TRUE) 
+    tmp_2 <- Q90(tmp_1, year = "any", monthly = FALSE, yearly = FALSE, breakdays = NULL, na.rm = TRUE) 
+    print(tmp_2)
+    tmp_2 <- data.frame(tmp_2)
+    df_q90_list[[i]] <- tmp_2
+  } else {
+    print(paste("ID", i, "error."))
+    df_q90_list[[i]] <- data.frame(Q90 = NA) 
+  }
+}
+
+df_q90 <- bind_rows(df_q90_list)
+row.names(df_q90) <- 1:nrow(df_q90)
+names(df_q90) <- "Q90"
+
+
+# 2.3- Q10 -------------------------------------------------------------- 
+df_q10_list <- list()
+
+for (i in seq(1, 20, 1)) {
+  print(i)
+  tmp <- b_obj %>% filter(id == i)
+  
+  tmp <- tmp %>% mutate(flow = ifelse(flow == 0, NA, flow))
+  tmp <- na.omit(tmp)  
+  if (nrow(tmp) > 0) { 
+    tmp_1 <- createlfobj(tmp[, -5], hyearstart = 10, baseflow = TRUE)
+    tmp_2 <- Qxx(tmp_1, Qxx = 10, year = "any", monthly = FALSE, yearly = FALSE, breakdays = NULL, na.rm = TRUE)
+    print(tmp_2)
+    tmp_2 <- data.frame(tmp_2)
+    df_q10_list[[i]] <- tmp_2
+  } else {
+    print(paste("ID", i, "error."))
+    df_q10_list[[i]] <- data.frame(Q10 = NA) 
+  }
+}
+
+df_q10 <- bind_rows(df_q10_list)
+row.names(df_q10) <- 1:nrow(df_q10) 
+names(df_q10) <- "Q10"
+
+
+# 2.4- R-B (Flashiness) Index  --------------------------------------------------------------  
+
+# RBIcalc: Input is a vector of mean daily flows.
+# Output is a value that is the RB Flashiness Index
+#RBIcalc(Q)  # Q = Vector of mean daily stream flows.
+#Returns a value that represents the RBI.
+
+rbi<-b_obj %>% 
+  group_by(year,id) %>%
+  summarise(sum_annual_flow = sum(flow)) %>%
+  mutate(mean_annual_flow = sum_annual_flow/365)
+
+sum(b_obj$flow[1:365])
+
+df_flash = data.frame()
+
+for (i in seq(1,20,1)) {
+  print(i)
+  tmp = filter(
+    b_obj, id == i) 
+    
+  tmp_1 = RBIcalc(tmp$flow) 
+
+  tmp_2 = data.frame(tmp_1)
+  
+  df_flash = rbind(df_flash,tmp_2) 
+}
+
+names(df_flash) = c("ID","Flashiness")
+head(df_flash)
+
+# 3- All indicators ---------------------------------------------------------------------------
+
+indicators <- bind_cols(df_bfi,df_flash[,2],df_q10,df_q90)
+setwd(choose.dir())
+choose.dir()
+write.csv("hydrological_indicators.csv",indicators,row.names = F)
+
+
+## 4- Flow Duration Curves ----------------------------------------------------------------------
+
+def2 <- def2 %>% 
+  filter(!is.na(flow))  
+
+def2 <- def2 %>%
+  group_by(id) %>%
+  mutate(rank = rank(-flow, ties.method = "first"), 
+         prob = rank / (n() + 1)) %>% 
+  ungroup()
+percentis <- def2 %>%
+  group_by(id) %>%
+  summarise(Q90 = quantile(flow, 0.10,na.rm = T),
+            Q10 = quantile(flow, 0.90,na.rm = T))
+FDCs <- ggplot(def2, aes(x = prob, y = flow, group = id)) +
+  geom_line(color="darkblue",linewidth=1) +  # FDCs
+  geom_vline(data = percentis, aes(xintercept = 0.10), linetype = "dashed") +  # Q90
+  geom_vline(data = percentis, aes(xintercept = 0.90), linetype = "dashed") +  # Q10
+  facet_wrap(~ id, scales = "free_y") +  # Um gráfico por bacia
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +  
+  labs(x = "Percentage of time flow is exceeded (%)", y = "Mean Flow from 1985-2018 (mm)", title = "Flow Duration Curves") +
+  theme_bw(base_size = 15)
+
+
+ggsave("FlowDurationCurves.jpeg", FDCs, height = 8 , width = 12,dpi = "retina")
+
